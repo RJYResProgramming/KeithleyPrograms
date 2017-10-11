@@ -1,6 +1,7 @@
 #!/usr/bin python 
 import tkinter as tk
 import serial
+
 import csv
 import numpy as np
 import matplotlib.pyplot as plt

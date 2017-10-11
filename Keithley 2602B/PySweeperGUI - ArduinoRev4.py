@@ -14,8 +14,6 @@ import serial.tools.list_ports
 #Only UpSweeps
 #4x4 support (Should be ablke to easily change to any array size by tweeking how 256 is split)
 #variable array sizes
-#ability to run all permutations in one set with number a loops per permutation
-# Percentage complete for loops and total percentage complete
 #add auto find ser
 #Find prettier TkInter Module!!!!
 
@@ -24,32 +22,43 @@ class Application(tk.Frame):
 		"""Application initialization
 		"""
 		tk.Frame.__init__(self, master)
-		ArduinoPorts = [
-			p.device
-			for p in serial.tools.list_ports.comports()
-			if 'Arduino' in p.description
-		]
-		KeithleyPorts = [
-			p.device
-			for p in serial.tools.list_ports.comports()
-			if 'USB-Serial' in p.description
-		]
-		
-		if len(KeithleyPorts) > 0:
-			self.ser=serial.Serial(KeithleyPorts[0], 115200, timeout=10, parity = serial.PARITY_NONE) #Keithley serial port - COM4: Desktop, COM5: Laptop
-			print("Keithley is on " + str(KeithleyPorts[0]))
-		else:
-			print("No serial port for Keithley")
-		if len(ArduinoPorts) > 0: 
-			self.ser1=serial.Serial(ArduinoPorts[0], 9600, timeout=10, parity = serial.PARITY_NONE) #Arduino serial port
-			print("Arduino is on " + str(ArduinoPorts[0]))
-		else:
-			print("No serial port for Arduino")
-
-		ports = list(serial.tools.list_ports.comports())  #Print all ports in use
-		for p in ports:
-			print(p)
-			print(p.serial_number)
+		try: 
+			self.ser=serial.Serial('/dev/ttyUSB0', 115200, timeout=20, parity = serial.PARITY_NONE) #Keithley serial port - COM4: Deskotp, COM5: Laptop
+		except:
+			print("No serial port for keithley")
+		try: 
+			self.ser1=serial.Serial('/dev/ttyACM0', 9600, timeout=10, parity = serial.PARITY_NONE) #Arduino serial port
+		except:
+			print("No serial port for arduino")
+##		ArduinoPorts = [
+##			p.device
+##			for p in serial.tools.list_ports.comports()
+##				
+##			if 'Arduino' in p.description
+##		]
+##		KeithleyPorts = [
+##			p.device
+##			for p in serial.tools.list_ports.comports()
+##				
+##			if 'USB-Serial' in p.description
+##		]
+##		print(KeithleyPorts)
+##		
+##		if len(KeithleyPorts) > 0:
+##			self.ser=serial.Serial(KeithleyPorts[0], 115200, timeout=10, parity = serial.PARITY_NONE) #Keithley serial port - COM4: Desktop, COM5: Laptop
+##			print("Keithley is on " + str(KeithleyPorts[0]))
+##		else:
+##			print("No serial port for Keithley")
+##		if len(ArduinoPorts) > 0: 
+##			self.ser1=serial.Serial(ArduinoPorts[0], 9600, timeout=10, parity = serial.PARITY_NONE) #Arduino serial port
+##			print("Arduino is on " + str(ArduinoPorts[0]))
+##		else:
+##			print("No serial port for Arduino")
+##
+##		ports = list(serial.tools.list_ports.comports())  #Print all ports in use
+##		for p in ports:
+##			print(p)
+##			print(p.serial_number)
 			
 		self.fig = plt.Figure(figsize=(7, 6), dpi=100)
 		self.fig.suptitle("I-V Sweep")
@@ -174,8 +183,10 @@ class Application(tk.Frame):
 		self.filenameLabel.grid(row = 0, column = 0, sticky = tk.W, padx = 5, pady = 5, in_ = self.fileFrame)
 		self.filenameEntry = tk.Entry(textvariable = self.filename)
 		self.filenameEntry.grid(row = 0, column = 1, sticky = tk.W, padx = 5, pady = 5, in_ = self.fileFrame)
+		self.filenamenumberEntry = tk.Entry(textvariable = self.filenamenumber, width = 3, justify = tk.RIGHT)
+		self.filenamenumberEntry.grid(row = 0, column = 2, sticky = tk.W, padx = 5, pady = 5, in_ = self.fileFrame)
 		self.setButton = tk.Button(self.fileFrame, text='Set', command=self.setfilename)
-		self.setButton.grid(row = 0, column = 2, sticky = tk.W)
+		self.setButton.grid(row = 0, column = 3, sticky = tk.W)
 		self.saveToLabel = tk.Label(text = "Next: ")
 		self.saveToLabel.grid(row = 1, column = 0, sticky = tk.W, padx = 5, pady = 5, in_ = self.fileFrame)
 		self.saveToLabelName = tk.Label(textvariable = self.filenametext)
@@ -435,7 +446,6 @@ class Application(tk.Frame):
 		self.ser.write("smua.trigger.measure.action = smua.ENABLE\n".encode())
 		self.ser.write("smua.trigger.initiate()\n".encode())
 		
-		
 	def recoverData(self, data):
 		"""Converts the binary data stream acquired from the SMU into a 2-column human-readable list containing voltage and current (as string lists)
 		for ease of manipulation and its later conversion into csv files.
@@ -448,7 +458,6 @@ class Application(tk.Frame):
 		for ii in range(0, self.steps.get()+1):
 			for jj in range(0,2):
 				results[jj].append(list.pop(0).pop())   #Extract the first two values of each serias (V,I) into results
-			
 		return results
 	
 	def joinData(self, data1, data2):
@@ -477,10 +486,6 @@ class Application(tk.Frame):
 	def loopSweeps(self):
 		dataArray = []
 		for l in range(0,self.loops.get()):
-			#if l % 2 == 0:
-			#	self.ser.write(("smua.trigger.source.linearv("+str(self.start.get())+","+str(self.stop.get())+","+str(self.steps.get()+1)+")\n" ).encode()) #UpSweep
-			#else:
-			#	self.ser.write(("smua.trigger.source.linearv("+str(self.stop.get())+","+str(self.start.get())+","+str(self.steps.get()+1)+")\n" ).encode()) #DownSweep	
 			self.loopCount.set(l + 1)
 			self.runSweep()
 			self.ser.write(("x = printbuffer(1,"+str(self.steps.get()+1)+",smua.nvbuffer2.sourcevalues, smua.nvbuffer2.readings)\n").encode())
@@ -491,6 +496,26 @@ class Application(tk.Frame):
 			self.loopCompleteInt.set(int(self.loopComplete.get()))
 			dataArray = self.joinData(dataArray, output)
 			self.ser.write("smua.source.output = smua.OUTPUT_OFF\n".encode())
+			time.sleep(self.delayLoop.get())
+			if self.holdMode.get() == 0:
+				self.a.hold(False)
+			elif self.holdMode.get() == 1:
+				self.a.hold(True)
+		self.ser.write("smua.source.output = smua.OUTPUT_OFF\n".encode())
+		self.loopComplete.set(0)
+		return dataArray
+
+	def loopSweeps1(self):
+		dataArray = []
+		for l in range(0,self.loops.get()):
+			self.loopCount.set(l + 1)
+			self.runSweep()
+			self.ser.write(("x = printbuffer(1,"+str(self.steps.get()+1)+",smua.nvbuffer2.sourcevalues, smua.nvbuffer2.readings)\n").encode())
+			self.ser.write("waitcomplete(0)\n".encode())
+			output = self.recoverData(self.ser.readline())
+			self.loopComplete.set(self.loopComplete.get() + self.loopStep.get())
+			self.loopCompleteInt.set(int(self.loopComplete.get()))
+			dataArray = self.joinData(dataArray, output)
 			time.sleep(self.delayLoop.get())
 			if self.holdMode.get() == 0:
 				self.a.hold(False)
@@ -641,17 +666,30 @@ class Application(tk.Frame):
 		colB = 0
 		colC = 0
 		colD = 0
-		#print(permutation)
-		colD = int(permutation / pow(self.arrayRow.get(),3))
-		permutation = permutation - (colD * pow(self.arrayRow.get(),3))
-		colC = int(permutation / pow(self.arrayRow.get(),2))
-		permutation = permutation - (colC * pow(self.arrayRow.get(),2))
-		colB = int(permutation / pow(self.arrayRow.get(),1))
-		permutation = permutation - (colB * pow(self.arrayRow.get(),1))
-		colA = int(permutation / 1)
-		#print(str(colA) + "  " +  str(colB) + "  " + str(colC) + "  "+ str(colD))
-		quadValue = "A" + str(colA) + "B" + str(colB) + "C" + str(colC) + "D" + str(colD)
+		columnA = ""
+		columnB = ""
+		columnC = ""
+		columnD = ""
+		
+		if self.arrayColumn.get() > 3:
+			colD = int(permutation / pow(self.arrayRow.get(),3))
+			permutation = permutation - (colD * pow(self.arrayRow.get(),3))
+			columnD = "D" + str(colD)
+		if self.arrayColumn.get() > 2:
+			colC = int(permutation / pow(self.arrayRow.get(),2))
+			permutation = permutation - (colC * pow(self.arrayRow.get(),2))
+			columnC = "C" + str(colC)
+		if self.arrayColumn.get() > 1:                        
+			colB = int(permutation / pow(self.arrayRow.get(),1))
+			permutation = permutation - (colB * pow(self.arrayRow.get(),1))
+			columnB = "B" + str(colB)
+		if self.arrayColumn.get() > 0:                       
+			colA = int(permutation / 1)
+			columnA = "A" + str(colA)
+					
+		quadValue = columnA + columnB + columnC + columnD
 		quadCode = 'Z' + quadValue
+		
 		print(quadValue)
 		self.ser1.write(quadCode.encode())
 
@@ -691,7 +729,7 @@ class Application(tk.Frame):
 			quadValue =  quadValue + "D2"
 		if self.quad16.get():
 			quadValue =  quadValue + "D3"			
-		#self.quadState.set(self.quadState.get() + 65)
+
 		quadCode = 'Z' + quadValue
 		print(quadValue)
 		self.ser1.write(quadCode.encode())
@@ -700,17 +738,12 @@ class Application(tk.Frame):
 		self.loopStep.set(100/self.loops.get())
 		self.perStep.set(100/self.switchKey.get())
 		self.perComplete.set(0)
+		self.configSweep()
 		
 		if self.holdMode.get() == 0:
 			self.a.hold(False)
 		elif self.holdMode.get() == 1:
 			self.a.hold(True)
-			
-		if self.modes.get() == 0:
-			self.configSweep()
-			
-		elif self.modes.get() == 1:
-			self.configCustomSweep()
 			
 		if self.QUADmode.get() == 0:
 			op=self.loopSweeps()
@@ -720,14 +753,11 @@ class Application(tk.Frame):
 		
 		elif self.QUADmode.get() == 1:
 			for p in range(0, self.switchKey.get()):
-				#if self.holdMode.get() == 0:
 				self.a.hold(False)
-				#elif self.holdMode.get() == 1:
-					#self.a.hold(True)
 				print(p)
 				self.QUADserialAuto(p)
-				time.sleep(0.5)
-				op=self.loopSweeps()
+				time.sleep(5) #Enough time for Bilateral switches to active in the correct order
+				op=self.loopSweeps1()
 				print("Sweep Complete")
 				self.perComplete.set(self.perComplete.get() + self.perStep.get())
 				self.perCompleteInt.set(int(self.perComplete.get()))
