@@ -297,8 +297,9 @@ class Configuration(tk.Frame):
                                         ser=serial.Serial(port.device, 57600, timeout=10, parity = serial.PARITY_NONE)
                 elif self.commsVar.get() == 'GPIB':
                         #rm = visa.ResourceManager('C:/windows/system32/visa32.dll')
+                        rm = visa.ResourceManager('C:/Program Files (x86)/IVI Foundation/VISA/WinNT/agvisa/agbin/visa32.dll')
                         #rm = visa.ResourceManager('@py')
-                        rm = visa.ResourceManager()
+                        #rm = visa.ResourceManager()
                         ser = rm.open_resource('GPIB0::24::INSTR')
                         ser.timeout = 100000
                 else: pass

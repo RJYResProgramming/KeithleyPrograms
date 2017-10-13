@@ -17,9 +17,16 @@ and recovery functions for the Keithley 6430 SourceMeter.
 protocol) ports. Communications with the SMU use the SCPI language.
 """
 
+def sendMessage(commPort, comms, message):
+    if comms == 'TCPIP':
+        commPort.write(message)
+    elif comms == 'GPIB':
+        commPort.write(message)
+    elif comms == 'Serial':
+        commPort.write(str(message+"\n").encode())
+    else: pass
 
-
-def configSweep(commPort, start = 0, stop = 0.2, steps = 100, delay = 0.02, compliance = 0.0005, NPLC = 0.05, smu = 'smua'):
+def configSweep(commPort, start, stop, steps, delay, compliance, NPLC, smu, comms):
     """
     Configure Keithley 2400 before performing a source voltage - measure current sweep.
         - comPort: Serial or GPIB port used to communicate with the SMU
@@ -34,60 +41,66 @@ def configSweep(commPort, start = 0, stop = 0.2, steps = 100, delay = 0.02, comp
             2400, remove in next version.
     """
     stepsize = (stop-start)/steps	#Step size
-    commPort.write("*RST\n".encode())	#Reset SMU
-    commPort.write(":SENS:FUNC:CONC OFF\n".encode())
-    commPort.write(":SOUR:FUNC VOLT\n".encode())	#Source Voltage
-    commPort.write(":SENS:FUNC 'CURR:DC'\n".encode())	#Sense current (DC)
-    commPort.write((":SENS:CURR:PROT "+str(compliance)+"\n").encode())	#Set compliance (A)
-    commPort.write(":SENS:CURR:NPLC 0.05\n".encode())
-    commPort.write((":SOUR:VOLT:STAR "+str(start)+"\n").encode())	#Set sweep start point (V)
-    commPort.write((":SOUR:VOLT:STOP "+str(stop)+"\n").encode())	#Set sweep start point (V)
-    commPort.write((":SOUR:VOLT:STEP "+str(stepsize)+"\n").encode())	#Set sweep step size (V)
-    commPort.write(":SOUR:VOLT:MODE SWE\n".encode())	#Change to sweep mode
-    commPort.write(":SOUR:SWE:RANG BEST\n".encode())	#Set source range AUTO/BEST/FIXED
-    commPort.write(":SOUR:SWE:SPAC LIN\n".encode())	#Set steps spacing LIN/LOG
-    commPort.write((":TRIG:COUN "+str(steps+1)+"\n").encode())	#Set amount of points to store in memory (steps + 1)
-    commPort.write((":SOUR:DEL "+str(delay)+"\n").encode())	#Set delay
+    sendMessage(commPort, comms, "*RST")	#Reset SMU
+    sendMessage(commPort, comms, ":SENS:FUNC:CONC OFF")
+    sendMessage(commPort, comms, ":SOUR:FUNC VOLT")	#Source Voltage
+    sendMessage(commPort, comms, ":SENS:FUNC 'CURR:DC'")	#Sense current (DC)
+    sendMessage(commPort, comms, (":SENS:CURR:PROT "+str(compliance)+""))	#Set compliance (A)
+    sendMessage(commPort, comms, ":SENS:CURR:NPLC 0.05")
+    sendMessage(commPort, comms, (":SOUR:VOLT:STAR "+str(start)+""))	#Set sweep start point (V)
+    sendMessage(commPort, comms, (":SOUR:VOLT:STOP "+str(stop)+""))	#Set sweep start point (V)
+    sendMessage(commPort, comms, (":SOUR:VOLT:STEP "+str(stepsize)+""))	#Set sweep step size (V)
+    sendMessage(commPort, comms, ":SOUR:VOLT:MODE SWE")	#Change to sweep mode
+    sendMessage(commPort, comms, ":SOUR:SWE:RANG BEST")	#Set source range AUTO/BEST/FIXED
+    sendMessage(commPort, comms, ":SOUR:SWE:SPAC LIN")	#Set steps spacing LIN/LOG
+    sendMessage(commPort, comms, (":TRIG:COUN "+str(steps+1)+""))	#Set amount of points to store in memory (steps + 1)
+    sendMessage(commPort, comms, (":SOUR:DEL "+str(delay)+""))	#Set delay
 
-def runSweep(commPort, smu = 'smua'):
-    switchSource(commPort, smu, True)
-    commPort.write(":READ?\n".encode())
+def runSweep(commPort, smu, comms):
+    switchSource(commPort, smu, True, comms)
+    
 
-def switchSource(commPort, smu = 'smua', on = False):
+def switchSource(commPort, smu, on, comms):
     if on == True:
-        commPort.write(":OUTP ON\n".encode())
+        sendMessage(commPort, comms, ":OUTP ON")
     else:
-        commPort.write(":OUTP OFF\n".encode())
+        sendMessage(commPort, comms, ":OUTP OFF")
 
-def loopSweeps(app, commPort, loops, loopvar, loopDelay, start, stop, steps, oneWay = False, smu = 'smua'):
+def loopSweeps(app, commPort, loops, loopvar, loopDelay, start, stop, steps, oneWay, smu, comms):
     dataArray = []
     for l in range(0,loops):
             if oneWay:
-               commPort.write(":SOUR:SWE:DIR UP\n".encode())
+               sendMessage(commPort, comms, ":SOUR:SWE:DIR UP")
             else:
                 if l % 2 == 0:
-                        commPort.write(":SOUR:SWE:DIR UP\n".encode())	
+                        sendMessage(commPort, comms, ":SOUR:SWE:DIR UP")	
                 else:
-                        commPort.write(":SOUR:SWE:DIR DOWN\n".encode())
+                        sendMessage(commPort, comms, ":SOUR:SWE:DIR DOWN")
             loopvar.set(l + 1)
             app.update()
-            runSweep(commPort, smu)
-            a = commPort.readline()
-            a = a.decode()
+            runSweep(commPort, smu, comms)
+            if comms == 'GPIB':
+                a=commPort.query(":READ?")
+            elif comms == 'Serial':
+                sendMessage(commPort, comms, ":READ?")
+                a = commPort.readline()
+                a = a.decode()
+            else:
+                a = []
             output = recoverData(a, steps)
             plotCurve(app, app.a, app.figureCanvas, output)
             dataArray = joinData(dataArray, output)
-            switchSource(commPort, smu, False)
+            switchSource(commPort, smu, False, comms)
             time.sleep(loopDelay)
-    switchSource(commPort, smu, False)
+    switchSource(commPort, smu, False, comms)
     return dataArray
 
 def go(app, commPort, start, stop, steps, loops, delay, loopDelay, compliance, NPLC, loopvar, filename, filenameNumber, filenameText, smu, comms): #change comms in all functions
     print("It's ALIVE!!!!")
     app.a.hold(False)
     compliance = app.compliance.get()
-    configSweep(commPort, start, stop, steps, delay, compliance, NPLC, 'smua')
-    op=loopSweeps(app, commPort, loops, loopvar, loopDelay, start, stop, steps, oneWay = False, smu = 'smua') ###Add this functionality hera and in the main program
+    configSweep(commPort, start, stop, steps, delay, compliance, NPLC, 'smua', comms)
+    op=loopSweeps(app, commPort, loops, loopvar, loopDelay, start, stop, steps, False, 'smua', comms) ###Add this functionality hera and in the main program
     exportFile(filenameText, steps, op)
     filenameNumber.set(1 + filenameNumber.get())
     setFilename(filename, filenameText, filenameNumber)
@@ -101,16 +114,15 @@ def recoverData(data, steps):
     """Converts the binary data stream acquired from the SMU into a 2-column human-readable list containing voltage and current (as string lists)
     for ease of manipulation and its later conversion into csv files.
     """
-    datacsv=csv.reader(data.split(',')) 
-    print(datacsv)	#Convert binary data into a csv structure containing strings, and split using the commas (,) as separators
+    datacsv=csv.reader(data.split(','))             #Convert binary data into a csv structure containing strings, and split using the commas (,) as separators
     list=[]                                                 #Empty list that will temporarily keep the extracted data (it comes as series of 5 values V,I,?,?,?)
-    results=[[],[]]                                         #Empty list that will store the data as [[V1, V2..., Vn],[I1,I2,...,In]]
+    results=[[],[],[],[],[]]                                         #Empty list that will store the data as [[V1, V2..., Vn],[I1,I2,...,In]]
     for row in datacsv:
             list.append(row)                                #Extract data from the csv structure into list
     for ii in range(0, steps+1):
-            for jj in range(0,2):
-                    results[jj].append(list.pop(0).pop())   #Extract the first two values of each serias (V,I) into results
-    return results
+            for jj in range(0,5):
+                results[jj].append(list.pop(0).pop())   #Extract the first two values of each serias (V,I) into results
+    return results[0:2]
 
 def joinData(data1, data2):
     for ii in range(0, len(data2)): 
@@ -145,3 +157,4 @@ __version__ = "0.0.1"
 __maintainer__ = "Ramón Bernardo Gavito"
 __email__ = "r.bernardogavito1@lancaster.ac.uk"
 __status__ = "Development"
+
